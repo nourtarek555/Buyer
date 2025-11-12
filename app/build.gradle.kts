@@ -51,6 +51,10 @@ dependencies {
     implementation("com.amazonaws:aws-android-sdk-s3:2.81.0")
     implementation("com.github.bumptech.glide:glide:4.16.0")
     kapt("com.github.bumptech.glide:compiler:4.16.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.0")
+    implementation("androidx.cardview:cardview:1.0.0")
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
