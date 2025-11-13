@@ -1,6 +1,5 @@
 package com.example.signallingms1
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,26 +22,15 @@ class ProductAdapter(
     }
 
     override fun onBindViewHolder(holder: ProductViewHolder, position: Int) {
-        Log.d("ProductAdapter", "Binding view at position $position, total items: ${products.size}")
-        if (position < products.size) {
-            holder.bind(products[position])
-        }
+        holder.bind(products[position])
     }
 
-    override fun getItemCount(): Int {
-        val count = products.size
-        Log.d("ProductAdapter", "getItemCount called: $count")
-        return count
-    }
+    override fun getItemCount(): Int = products.size
 
     fun updateProducts(newProducts: List<Product>) {
-        Log.d("ProductAdapter", "updateProducts called with ${newProducts.size} products")
-        val oldSize = products.size
         products.clear()
         products.addAll(newProducts)
-        Log.d("ProductAdapter", "Products list updated. Old size: $oldSize, New size: ${products.size}")
         notifyDataSetChanged()
-        Log.d("ProductAdapter", "notifyDataSetChanged() called")
     }
 
     inner class ProductViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -56,30 +44,25 @@ class ProductAdapter(
         private val btnAddToCart: Button = itemView.findViewById(R.id.btnAddToCart)
 
         private var currentQuantity = 0
+        private var currentProduct: Product? = null
 
         fun bind(product: Product) {
-            val productNameValue = product.getDisplayName()
-            val productPriceValue = product.getDisplayPrice()
-            val productStockValue = product.getDisplayStock()
-            val productImageUrl = product.getDisplayImageUrl()
+            // Store the current product to avoid issues with ViewHolder reuse
+            currentProduct = product
             
-            productName.text = productNameValue
-            productPrice.text = "$${String.format("%.2f", productPriceValue)}"
-            productQuantity.text = "Stock: $productStockValue"
+            // Reset quantity when binding a new product
             currentQuantity = 0
-            quantityText.text = "0"
+            
+            productName.text = product.getDisplayName()
+            productPrice.text = "$${String.format("%.2f", product.getDisplayPrice())}"
+            productQuantity.text = "Stock: ${product.getDisplayStock()}"
+            quantityText.text = currentQuantity.toString()
 
-            // Load image with placeholder - handles empty URLs gracefully
-            if (productImageUrl.isNotEmpty()) {
-                Glide.with(itemView.context)
-                    .load(productImageUrl)
-                    .placeholder(R.drawable.ic_person)
-                    .error(R.drawable.ic_person)
-                    .into(productImage)
-            } else {
-                // Set placeholder directly if no image URL
-                productImage.setImageResource(R.drawable.ic_person)
-            }
+            Glide.with(itemView.context)
+                .load(product.getDisplayImageUrl())
+                .placeholder(R.drawable.ic_person)
+                .error(R.drawable.ic_person)
+                .into(productImage)
 
             btnDecrease.setOnClickListener {
                 if (currentQuantity > 0) {
@@ -89,7 +72,8 @@ class ProductAdapter(
             }
 
             btnIncrease.setOnClickListener {
-                if (currentQuantity < productStockValue) {
+                val product = currentProduct ?: return@setOnClickListener
+                if (currentQuantity < product.getDisplayStock()) {
                     currentQuantity++
                     quantityText.text = currentQuantity.toString()
                 } else {
@@ -98,26 +82,16 @@ class ProductAdapter(
             }
 
             btnAddToCart.setOnClickListener {
+                val product = currentProduct ?: return@setOnClickListener
                 if (currentQuantity > 0) {
-                    if (currentQuantity <= productStockValue) {
-                        // Update product with correct values before adding to cart
-                        product.name = productNameValue
-                        product.price = productPriceValue
-                        product.quantity = productStockValue
-                        product.imageUrl = productImageUrl
-                        
-                        onAddToCart(product, currentQuantity)
-                        Toast.makeText(itemView.context, "Added to cart!", Toast.LENGTH_SHORT).show()
-                        currentQuantity = 0
-                        quantityText.text = "0"
-                    } else {
-                        Toast.makeText(itemView.context, "Not enough stock", Toast.LENGTH_SHORT).show()
-                    }
+                    onAddToCart(product, currentQuantity)
+                    Toast.makeText(itemView.context, "Added $currentQuantity to cart", Toast.LENGTH_SHORT).show()
+                    currentQuantity = 0
+                    quantityText.text = "0"
                 } else {
-                    Toast.makeText(itemView.context, "Please select quantity", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(itemView.context, "Select quantity", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 }
-

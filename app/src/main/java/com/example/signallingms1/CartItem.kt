@@ -6,8 +6,13 @@ data class CartItem(
     var productName: String = "",
     var price: Double = 0.0,
     var quantity: Int = 1,
-    var imageUrl: String = ""
+    var imageUrl: String = "",
+    var maxStock: Int = 0  // Maximum available stock when added to cart
 ) {
     fun getTotalPrice(): Double = price * quantity
+    
+    fun canIncreaseQuantity(): Boolean {
+        return quantity < maxStock
+    }
 }
 

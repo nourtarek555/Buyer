@@ -38,65 +38,190 @@ class CartFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        rvCart = view.findViewById(R.id.rvCart)
-        tvTotalPrice = view.findViewById(R.id.tvTotalPrice)
-        tvEmpty = view.findViewById(R.id.tvEmpty)
-        btnClearCart = view.findViewById(R.id.btnClearCart)
-        btnPlaceOrder = view.findViewById(R.id.btnPlaceOrder)
+        try {
+            if (!isAdded || context == null) return
 
-        cartAdapter = CartAdapter(cartItems,
-            onQuantityChanged = { productId, quantity ->
-                CartManager.updateQuantity(requireContext(), productId, quantity)
-                refreshCart()
-            },
-            onItemRemoved = { productId ->
-                CartManager.removeFromCart(requireContext(), productId)
+            rvCart = view.findViewById(R.id.rvCart)
+            tvTotalPrice = view.findViewById(R.id.tvTotalPrice)
+            tvEmpty = view.findViewById(R.id.tvEmpty)
+            btnClearCart = view.findViewById(R.id.btnClearCart)
+            btnPlaceOrder = view.findViewById(R.id.btnPlaceOrder)
+
+            cartAdapter = CartAdapter(cartItems,
+                onQuantityChanged = { productId, sellerId, quantity ->
+                    if (isAdded && context != null) {
+                        // Fetch current stock from Firebase before updating
+                        fetchAndUpdateQuantity(productId, sellerId, quantity)
+                    }
+                },
+                onItemRemoved = { productId ->
+                    if (isAdded && context != null) {
+                        CartManager.removeFromCart(requireContext(), productId)
+                        refreshCart()
+                    }
+                }
+            )
+
+            rvCart.layoutManager = LinearLayoutManager(requireContext())
+            rvCart.adapter = cartAdapter
+
+            btnClearCart.setOnClickListener {
+                if (isAdded && context != null) {
+                    CartManager.clearCart(requireContext())
+                    refreshCart()
+                    Toast.makeText(context, "Cart cleared", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            btnPlaceOrder.setOnClickListener {
+                placeOrder()
+            }
+
+            // Delay refresh to ensure views are fully initialized
+            view.post {
                 refreshCart()
             }
-        )
-
-        rvCart.layoutManager = LinearLayoutManager(context)
-        rvCart.adapter = cartAdapter
-
-        btnClearCart.setOnClickListener {
-            CartManager.clearCart(requireContext())
-            refreshCart()
-            Toast.makeText(context, "Cart cleared", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            android.util.Log.e("CartFragment", "Error in onViewCreated: ${e.message}", e)
+            e.printStackTrace()
         }
-
-        btnPlaceOrder.setOnClickListener {
-            placeOrder()
-        }
-
-        refreshCart()
     }
 
     override fun onResume() {
         super.onResume()
-        refreshCart()
+        if (isAdded && view != null) {
+            view?.post {
+                refreshCart()
+            }
+        }
     }
 
     private fun refreshCart() {
-        val items = CartManager.getCartItemsList(requireContext())
-        cartItems.clear()
-        cartItems.addAll(items)
-
-        if (cartItems.isEmpty()) {
-            tvEmpty.visibility = View.VISIBLE
-            rvCart.visibility = View.GONE
-            btnPlaceOrder.isEnabled = false
-        } else {
-            tvEmpty.visibility = View.GONE
-            rvCart.visibility = View.VISIBLE
-            btnPlaceOrder.isEnabled = true
+        if (!isAdded || context == null || view == null) {
+            android.util.Log.w("CartFragment", "Cannot refresh cart - fragment not ready")
+            return
         }
+        
+        try {
+            // Check if adapter is initialized
+            if (!::cartAdapter.isInitialized) {
+                android.util.Log.w("CartFragment", "Adapter not initialized yet")
+                return
+            }
+            
+            val items = CartManager.getCartItemsList(requireContext())
+            android.util.Log.d("CartFragment", "Cart items count: ${items.size}")
+            
+            if (items.isNotEmpty()) {
+                android.util.Log.d("CartFragment", "Cart items: ${items.map { "${it.productName} x${it.quantity}" }}")
+            }
+            
+            cartItems.clear()
+            cartItems.addAll(items)
 
-        val total = CartManager.getTotalPrice(requireContext())
-        tvTotalPrice.text = "$${String.format("%.2f", total)}"
-        cartAdapter.updateCartItems(cartItems)
+            if (cartItems.isEmpty()) {
+                android.util.Log.d("CartFragment", "Cart is empty, showing empty message")
+                tvEmpty.visibility = View.VISIBLE
+                rvCart.visibility = View.GONE
+                btnPlaceOrder.isEnabled = false
+            } else {
+                android.util.Log.d("CartFragment", "Cart has ${cartItems.size} items, showing cart")
+                tvEmpty.visibility = View.GONE
+                rvCart.visibility = View.VISIBLE
+                btnPlaceOrder.isEnabled = true
+            }
+
+            val total = CartManager.getTotalPrice(requireContext())
+            android.util.Log.d("CartFragment", "Total price: $total")
+            tvTotalPrice.text = "$${String.format("%.2f", total)}"
+            
+            // Update adapter
+            cartAdapter.updateCartItems(ArrayList(cartItems))
+            android.util.Log.d("CartFragment", "Adapter updated with ${cartAdapter.itemCount} items")
+        } catch (e: Exception) {
+            android.util.Log.e("CartFragment", "Error refreshing cart: ${e.message}", e)
+            e.printStackTrace()
+        }
+    }
+
+    private fun fetchAndUpdateQuantity(productId: String, sellerId: String, quantity: Int) {
+        if (!isAdded || context == null) return
+        
+        // Fetch current stock from Firebase - try "Products" first, then "products"
+        val productsRef = database.getReference("Seller").child(sellerId).child("Products").child(productId)
+        productsRef.get().addOnSuccessListener { snapshot ->
+            if (!isAdded || context == null) return@addOnSuccessListener
+            
+            if (snapshot.exists()) {
+                try {
+                    // Get stock value (can be String or Int)
+                    val stockValue = snapshot.child("stock").getValue(Any::class.java)
+                    val currentStock = when (stockValue) {
+                        is Int -> stockValue
+                        is Long -> stockValue.toInt()
+                        is String -> stockValue.toIntOrNull() ?: 0
+                        is Number -> stockValue.toInt()
+                        else -> 0
+                    }
+                    
+                    // Update quantity with current stock validation
+                    val (success, message) = CartManager.updateQuantity(requireContext(), productId, quantity, currentStock)
+                    if (!success) {
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    }
+                    refreshCart()
+                } catch (e: Exception) {
+                    android.util.Log.e("CartFragment", "Error fetching stock: ${e.message}", e)
+                    handleStockFetchFallback(productId, quantity)
+                }
+            } else {
+                // Try lowercase "products"
+                val productsRefLower = database.getReference("Seller").child(sellerId).child("products").child(productId)
+                productsRefLower.get().addOnSuccessListener { snapshot2 ->
+                    if (!isAdded || context == null) return@addOnSuccessListener
+                    try {
+                        val stockValue = snapshot2.child("stock").getValue(Any::class.java)
+                        val currentStock = when (stockValue) {
+                            is Int -> stockValue
+                            is Long -> stockValue.toInt()
+                            is String -> stockValue.toIntOrNull() ?: 0
+                            is Number -> stockValue.toInt()
+                            else -> 0
+                        }
+                        val (success, message) = CartManager.updateQuantity(requireContext(), productId, quantity, currentStock)
+                        if (!success) {
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                        refreshCart()
+                    } catch (e: Exception) {
+                        android.util.Log.e("CartFragment", "Error fetching stock: ${e.message}", e)
+                        handleStockFetchFallback(productId, quantity)
+                    }
+                }.addOnFailureListener {
+                    handleStockFetchFallback(productId, quantity)
+                }
+            }
+        }.addOnFailureListener { error ->
+            if (isAdded && context != null) {
+                android.util.Log.e("CartFragment", "Failed to fetch stock: ${error.message}", error)
+                handleStockFetchFallback(productId, quantity)
+            }
+        }
+    }
+    
+    private fun handleStockFetchFallback(productId: String, quantity: Int) {
+        if (!isAdded || context == null) return
+        // Fallback to stored maxStock if fetch fails
+        val (success, message) = CartManager.updateQuantity(requireContext(), productId, quantity)
+        if (!success) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+        refreshCart()
     }
 
     private fun placeOrder() {
+        if (!isAdded || context == null) return
+        
         val buyerId = auth.currentUser?.uid
         if (buyerId == null) {
             Toast.makeText(context, "User not logged in", Toast.LENGTH_SHORT).show()
@@ -145,12 +270,16 @@ class CartFragment : Fragment() {
                     // Save order
                     database.getReference("Orders").child(orderId).setValue(order)
                         .addOnSuccessListener {
-                            Toast.makeText(context, "Order placed successfully!", Toast.LENGTH_SHORT).show()
-                            CartManager.clearCart(requireContext())
-                            refreshCart()
+                            if (isAdded && context != null) {
+                                Toast.makeText(context, "Order placed successfully!", Toast.LENGTH_SHORT).show()
+                                CartManager.clearCart(requireContext())
+                                refreshCart()
+                            }
                         }
                         .addOnFailureListener {
-                            Toast.makeText(context, "Failed to place order: ${it.message}", Toast.LENGTH_SHORT).show()
+                            if (isAdded && context != null) {
+                                Toast.makeText(context, "Failed to place order: ${it.message}", Toast.LENGTH_SHORT).show()
+                            }
                         }
                 }
             }

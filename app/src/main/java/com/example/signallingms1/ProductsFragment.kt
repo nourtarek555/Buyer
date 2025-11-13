@@ -48,7 +48,8 @@ class ProductsFragment : Fragment() {
 
             productAdapter = ProductAdapter(products) { product, quantity ->
                 if (isAdded && context != null) {
-                    CartManager.addToCart(requireContext(), product, quantity)
+                    val (success, message) = CartManager.addToCart(requireContext(), product, quantity)
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -192,52 +193,45 @@ class ProductsFragment : Fragment() {
                 try {
                     val productKey = productSnapshot.key ?: "unknown"
                     android.util.Log.d("ProductsFragment", "Processing product key: $productKey")
-                    android.util.Log.d("ProductsFragment", "Product data: ${productSnapshot.value}")
                     
-                    // Try to get all fields first to see what's available
-                    val nameField = productSnapshot.child("Name")
-                    val priceField = productSnapshot.child("Price")
-                    val stockField = productSnapshot.child("Stock")
-                    val photoUrlField = productSnapshot.child("PhotoUrl")
+                    // Always use manual mapping to handle string values for price/stock
+                    val name = productSnapshot.child("name").getValue(String::class.java) ?: ""
                     
-                    android.util.Log.d("ProductsFragment", "Name exists: ${nameField.exists()}, value: ${nameField.getValue(String::class.java)}")
-                    android.util.Log.d("ProductsFragment", "Price exists: ${priceField.exists()}, value: ${priceField.getValue(Double::class.java)}")
-                    android.util.Log.d("ProductsFragment", "Stock exists: ${stockField.exists()}, value: ${stockField.getValue(Int::class.java)}")
-                    android.util.Log.d("ProductsFragment", "PhotoUrl exists: ${photoUrlField.exists()}, value: ${photoUrlField.getValue(String::class.java)}")
-                    
-                    val product = productSnapshot.getValue(Product::class.java)
-                    if (product != null) {
-                        product.productId = productKey
-                        product.sellerId = sellerId
-                        android.util.Log.d("ProductsFragment", "Successfully deserialized product: ${product.getDisplayName()}, price: ${product.getDisplayPrice()}, stock: ${product.getDisplayStock()}")
-                        products.add(product)
-                    } else {
-                        android.util.Log.w("ProductsFragment", "Failed to deserialize product, trying manual mapping")
-                        // Manual mapping if deserialization fails
-                        val name = productSnapshot.child("Name").getValue(String::class.java) 
-                            ?: productSnapshot.child("name").getValue(String::class.java) ?: ""
-                        val price = productSnapshot.child("Price").getValue(Double::class.java)
-                            ?: productSnapshot.child("price").getValue(Double::class.java) ?: 0.0
-                        val stock = productSnapshot.child("Stock").getValue(Int::class.java)
-                            ?: productSnapshot.child("stock").getValue(Int::class.java)
-                            ?: productSnapshot.child("quantity").getValue(Int::class.java) ?: 0
-                        val photoUrl = productSnapshot.child("PhotoUrl").getValue(String::class.java)
-                            ?: productSnapshot.child("photoUrl").getValue(String::class.java)
-                            ?: productSnapshot.child("imageUrl").getValue(String::class.java) ?: ""
-                        
-                        android.util.Log.d("ProductsFragment", "Manual mapping - name: $name, price: $price, stock: $stock, photoUrl: $photoUrl")
-                        
-                        val manualProduct = Product(
-                            productId = productKey,
-                            sellerId = sellerId,
-                            name = name,
-                            price = price,
-                            stock = stock,
-                            imageUrl = photoUrl
-                        )
-                        android.util.Log.d("ProductsFragment", "Manually created product: ${manualProduct.getDisplayName()}, price: ${manualProduct.getDisplayPrice()}, stock: ${manualProduct.getDisplayStock()}")
-                        products.add(manualProduct)
+                    // Price can be Double or String
+                    val priceValue = productSnapshot.child("price").getValue(Any::class.java)
+                    val price = when (priceValue) {
+                        is Double -> priceValue
+                        is Long -> priceValue.toDouble()
+                        is String -> priceValue.toDoubleOrNull() ?: 0.0
+                        is Number -> priceValue.toDouble()
+                        else -> 0.0
                     }
+                    
+                    // Stock can be Int or String
+                    val stockValue = productSnapshot.child("stock").getValue(Any::class.java)
+                    val stock = when (stockValue) {
+                        is Int -> stockValue
+                        is Long -> stockValue.toInt()
+                        is String -> stockValue.toIntOrNull() ?: 0
+                        is Number -> stockValue.toInt()
+                        else -> productSnapshot.child("quantity").getValue(Int::class.java) ?: 0
+                    }
+                    
+                    val photoUrl = productSnapshot.child("photoUrl").getValue(String::class.java)
+                        ?: productSnapshot.child("imageUrl").getValue(String::class.java) ?: ""
+                    
+                    android.util.Log.d("ProductsFragment", "Manual mapping - name: $name, price: $price, stock: $stock, photoUrl: $photoUrl")
+                    
+                    val product = Product(
+                        productId = productKey,
+                        sellerId = sellerId,
+                        name = name,
+                        price = price,
+                        stock = stock,
+                        imageUrl = photoUrl
+                    )
+                    android.util.Log.d("ProductsFragment", "Created product: ${product.getDisplayName()}, price: ${product.getDisplayPrice()}, stock: ${product.getDisplayStock()}")
+                    products.add(product)
                 } catch (e: Exception) {
                     // Skip this product if mapping fails
                     android.util.Log.e("ProductsFragment", "Error processing product: ${e.message}", e)

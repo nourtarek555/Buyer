@@ -8,6 +8,6 @@ data class Seller(
     var address: String = "",
     var appType: String = "Seller",
     var photoUrl: String = "",
-    var shopName: String = ""
+    var shopName: String = "",
+    var products: MutableMap<String, Product> = mutableMapOf()
 )
-

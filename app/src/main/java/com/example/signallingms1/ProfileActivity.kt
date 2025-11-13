@@ -37,11 +37,6 @@ class ProfileActivity : AppCompatActivity() {
     private var imageUri: Uri? = null
     private val PICK_IMAGE_REQUEST = 100
 
-    private val ACCESS_KEY = "REDACTED"
-    private val SECRET_KEY = "REDACTED"
-    private val BUCKET_NAME = "REDACTED"
-    private val REGION = Regions.EU_NORTH_1
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_profile)
@@ -144,8 +139,8 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun uploadImageToS3(uid: String, uri: Uri, callback: (String) -> Unit) {
-        val credentials = BasicAWSCredentials(ACCESS_KEY, SECRET_KEY)
-        val s3Client = AmazonS3Client(credentials, com.amazonaws.regions.Region.getRegion(REGION))
+        val credentials = BasicAWSCredentials(S3Config.ACCESS_KEY, S3Config.SECRET_KEY)
+        val s3Client = AmazonS3Client(credentials, com.amazonaws.regions.Region.getRegion(S3Config.REGION))
         val transferUtility = TransferUtility.builder()
             .context(applicationContext)
             .s3Client(s3Client)
@@ -155,7 +150,7 @@ class ProfileActivity : AppCompatActivity() {
         val file = FileUtil.from(this, uri)
 
         val uploadObserver = transferUtility.upload(
-            BUCKET_NAME,
+            S3Config.BUCKET_NAME,
             fileName,
             file,
             CannedAccessControlList.PublicRead // <-- Make uploaded file public
@@ -164,7 +159,7 @@ class ProfileActivity : AppCompatActivity() {
         uploadObserver.setTransferListener(object : TransferListener {
             override fun onStateChanged(id: Int, state: TransferState?) {
                 if (state == TransferState.COMPLETED) {
-                    val imageUrl = "https://$BUCKET_NAME.s3.amazonaws.com/$fileName"
+                    val imageUrl = S3Config.getImageUrl(fileName)
                     callback(imageUrl)
                 } else if (state == TransferState.FAILED) {
                     progressBar.visibility = View.GONE

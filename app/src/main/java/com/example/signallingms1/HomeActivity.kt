@@ -16,7 +16,6 @@ class HomeActivity : AppCompatActivity() {
 
     private lateinit var viewPager: ViewPager2
     private lateinit var tabLayout: TabLayout
-    private lateinit var shopsFragment: ShopsFragment
     private var backStackListenerAdded = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,29 +25,44 @@ class HomeActivity : AppCompatActivity() {
         viewPager = findViewById(R.id.viewPager)
         tabLayout = findViewById(R.id.tabLayout)
 
-        shopsFragment = ShopsFragment()
-
-        // Set up shop selection callback - navigate to products fragment
-        shopsFragment.onShopSelected = { seller ->
-            navigateToProducts(seller)
-        }
-
-        val fragments = listOf<Fragment>(
-            ProfileFragment(),
-            shopsFragment,
-            CartFragment()
-        )
-
         val tabTitles = listOf("Profile", "Shops", "Cart")
 
-        viewPager.adapter = MainPagerAdapter(this, fragments)
+        viewPager.adapter = MainPagerAdapter(this)
 
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
             tab.text = tabTitles[position]
         }.attach()
         
+        // Handle tab clicks to allow navigation even when ProductsFragment is visible
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                val position = tab?.position ?: return
+                
+                // If ProductsFragment is visible, hide it and show ViewPager
+                val fragmentContainer = findViewById<androidx.fragment.app.FragmentContainerView>(R.id.fragmentContainer)
+                if (fragmentContainer?.visibility == View.VISIBLE) {
+                    // Pop back stack to hide ProductsFragment
+                    supportFragmentManager.popBackStack()
+                    fragmentContainer.visibility = View.GONE
+                    viewPager.visibility = View.VISIBLE
+                }
+                
+                // Switch to selected tab
+                viewPager.setCurrentItem(position, false)
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
+        
         // Set up back stack listener once
         setupBackStackListener()
+    }
+    
+    fun setShopSelectionCallback(shopsFragment: ShopsFragment) {
+        shopsFragment.onShopSelected = { seller ->
+            navigateToProducts(seller)
+        }
     }
     
     private fun setupBackStackListener() {
@@ -93,12 +107,18 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private class MainPagerAdapter(
-        fragmentActivity: FragmentActivity,
-        private val fragments: List<Fragment>
+        fragmentActivity: FragmentActivity
     ) : FragmentStateAdapter(fragmentActivity) {
 
-        override fun getItemCount(): Int = fragments.size
+        override fun getItemCount(): Int = 3
 
-        override fun createFragment(position: Int): Fragment = fragments[position]
+        override fun createFragment(position: Int): Fragment {
+            return when (position) {
+                0 -> ProfileFragment()
+                1 -> ShopsFragment()
+                2 -> CartFragment()
+                else -> throw IllegalArgumentException("Invalid position: $position")
+            }
+        }
     }
 }

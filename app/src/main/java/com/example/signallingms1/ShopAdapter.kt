@@ -1,11 +1,11 @@
 package com.example.signallingms1
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 
@@ -21,31 +21,15 @@ class ShopAdapter(
     }
 
     override fun onBindViewHolder(holder: ShopViewHolder, position: Int) {
-        Log.d("ShopAdapter", "Binding view at position $position, total items: ${shops.size}")
-        if (position < shops.size) {
-            holder.bind(shops[position])
-        }
+        holder.bind(shops[position])
     }
 
-    override fun getItemCount(): Int {
-        val count = shops.size
-        Log.d("ShopAdapter", "getItemCount called: $count")
-        return count
-    }
+    override fun getItemCount(): Int = shops.size
 
     fun updateShops(newShops: List<Seller>) {
-        Log.d("ShopAdapter", "updateShops called with ${newShops.size} shops")
-        val oldSize = shops.size
         shops.clear()
         shops.addAll(newShops)
-        Log.d("ShopAdapter", "Shops list updated. Old size: $oldSize, New size: ${shops.size}")
-        if (oldSize == 0 && newShops.isNotEmpty()) {
-            notifyItemRangeInserted(0, newShops.size)
-            Log.d("ShopAdapter", "Called notifyItemRangeInserted(0, ${newShops.size})")
-        } else {
-            notifyDataSetChanged()
-            Log.d("ShopAdapter", "Called notifyDataSetChanged()")
-        }
+        notifyDataSetChanged()
     }
 
     inner class ShopViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -69,4 +53,3 @@ class ShopAdapter(
         }
     }
 }
-

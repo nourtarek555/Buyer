@@ -7,17 +7,17 @@ import com.google.firebase.database.PropertyName
 data class Product(
     var productId: String = "",
     var sellerId: String = "",
-    @get:PropertyName("Name")
-    @set:PropertyName("Name")
+    @get:PropertyName("name")
+    @set:PropertyName("name")
     var name: String = "",
-    @get:PropertyName("Price")
-    @set:PropertyName("Price")
+    @get:PropertyName("price")
+    @set:PropertyName("price")
     var price: Double = 0.0,
-    @get:PropertyName("Stock")
-    @set:PropertyName("Stock")
+    @get:PropertyName("stock")
+    @set:PropertyName("stock")
     var stock: Int = 0,
-    @get:PropertyName("PhotoUrl")
-    @set:PropertyName("PhotoUrl")
+    @get:PropertyName("photoUrl")
+    @set:PropertyName("photoUrl")
     var imageUrl: String = "",
     var description: String = ""
 ) {

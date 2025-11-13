@@ -6,12 +6,13 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 
 class CartAdapter(
     private val cartItems: MutableList<CartItem>,
-    private val onQuantityChanged: (String, Int) -> Unit,
+    private val onQuantityChanged: (String, String, Int) -> Unit,  // productId, sellerId, quantity
     private val onItemRemoved: (String) -> Unit
 ) : RecyclerView.Adapter<CartAdapter.CartViewHolder>() {
 
@@ -54,17 +55,23 @@ class CartAdapter(
                 .error(R.drawable.ic_person)
                 .into(productImage)
 
+            // Disable increase button if at max stock (handle old items without maxStock)
+            val maxStock = if (cartItem.maxStock > 0) cartItem.maxStock else cartItem.quantity
+            btnIncrease.isEnabled = cartItem.quantity < maxStock
+
             btnDecrease.setOnClickListener {
                 val newQuantity = cartItem.quantity - 1
                 if (newQuantity <= 0) {
                     onItemRemoved(cartItem.productId)
                 } else {
-                    onQuantityChanged(cartItem.productId, newQuantity)
+                    onQuantityChanged(cartItem.productId, cartItem.sellerId, newQuantity)
                 }
             }
 
             btnIncrease.setOnClickListener {
-                onQuantityChanged(cartItem.productId, cartItem.quantity + 1)
+                val newQuantity = cartItem.quantity + 1
+                // Check will be done in CartFragment after fetching from database
+                onQuantityChanged(cartItem.productId, cartItem.sellerId, newQuantity)
             }
         }
     }
